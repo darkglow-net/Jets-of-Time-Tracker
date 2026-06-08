@@ -20,7 +20,9 @@ CHECK_COUNTERS = {chests = 0, sealed_chests = 0, base_checks = 0}
 -- Invoked when the auto-tracker is activated/connected
 --
 function autotracker_started()
-    
+  if AutoTracker and AutoTracker.InvalidateReadCaches then
+    AutoTracker:InvalidateReadCaches()
+  end
 end
 
 --
@@ -35,11 +37,32 @@ function printDebug(message)
 end
 
 --
+-- Safely determine if a tracker object was modified by the user.
+-- Some object types do not expose Owner in newer hosts.
+--
+function modifiedByUser(trackerObject)
+
+  return trackerObject and trackerObject.Owner and trackerObject.Owner.ModifiedByUser
+
+end
+
+--
+-- Safely get the active variant UID.
+--
+function activeVariantUID()
+
+  return (Tracker and Tracker.ActiveVariantUID) or ""
+
+end
+
+--
 -- Check if the tracker variant is set to Items Only.
 --
 function itemsOnlyTracking()
 
-  return string.find(Tracker.ActiveVariantUID, "items")
+  local uid = activeVariantUID()
+
+  return string.find(uid, "items")
 
 end
 
@@ -48,7 +71,9 @@ end
 --
 function lostWorldsMode()
 
-  return string.find(Tracker.ActiveVariantUID, "lost_world")
+  local uid = activeVariantUID()
+
+  return string.find(uid, "lost_world")
 
 end
 
@@ -57,7 +82,9 @@ end
 --
 function vanillaRandoMode()
 
-  return string.find(Tracker.ActiveVariantUID, "vanilla")
+  local uid = activeVariantUID()
+
+  return string.find(uid, "vanilla")
 
 end
 
@@ -66,7 +93,9 @@ end
 --
 function legacyOfCyrusMode()
 
-  return string.find(Tracker.ActiveVariantUID, "legacy_of_cyrus")
+  local uid = activeVariantUID()
+
+  return string.find(uid, "legacy_of_cyrus")
 
 end
 
@@ -84,9 +113,20 @@ end
 --
 function inGame()
 
+  if not AutoTracker then
+    return false
+  end
+
+  local ok, firstSlot, secondSlot = pcall(function()
+    return AutoTracker:ReadU8(0x7E2980), AutoTracker:ReadU8(0x7E2981)
+  end)
+  if not ok then
+    return false
+  end
+
   -- Check the first 2 character slots.  If both are 0 (Crono's ID) then the game 
   -- hasn't started yet or has been reset.
-  return not (AutoTracker:ReadU8(0x7E2980) == 0 and AutoTracker:ReadU8(0x7E2981) == 0) 
+  return not (firstSlot == 0 and secondSlot == 0)
 
  end
 
@@ -146,7 +186,7 @@ function updateEvent(name, segment, address, flag)
   local completed = 0
   
   if trackerItem then
-    if trackerItem.Owner.ModifiedByUser then
+    if modifiedByUser(trackerItem) then
       -- early return if the item has been modified by the user. 
       return 0
     end
@@ -173,7 +213,7 @@ function updateBoss(name, segment, address, flag)
 
   local trackerItem = Tracker:FindObjectForCode(name)
   if trackerItem then
-    if trackerItem.Owner.ModifiedByUser then
+    if modifiedByUser(trackerItem) then
       -- early return if the item has been modified by the user. 
       return
     end
@@ -205,9 +245,9 @@ function handleZenanBridge(segment)
   -- of the flag's state.  Only track this if the tracker is not set to 
   -- "Items Only" tracking mode.
   if not itemsOnlyTracking() and not lostWorldsMode() then
-    if zombor.Active then
+    if zombor and zombor.Active then
       local cookItem = Tracker:FindObjectForCode("@Zenan Bridge/Cook's Rations")
-      if not cookItem.Owner.ModifiedByUser then
+      if cookItem and not modifiedByUser(cookItem) then
         cookItem.AvailableChestCount = 0
         completed = 1
       end
@@ -237,10 +277,14 @@ function handleMelchiorRefinements(segment)
   local yakraxiii = Tracker:FindObjectForCode("yakraxiiiboss")
   local melchior = Tracker:FindObjectForCode("@Guardia Castle Present/Melchior's Refinements")
   local completed = 0
+
+  if not yakraxiii or not melchior then
+    return 0
+  end
   
-  if melchior.Owner.ModifiedByUser or itemsOnlyTracking() then
+  if modifiedByUser(melchior) then
     -- Break out early if the item has been modified by the user
-    return
+    return 0
   end
   
   if yakraxiii.Active then
@@ -266,8 +310,12 @@ end
 --
 function handleMoonstone(keyItem) 
 
-  moonstone = Tracker:FindObjectForCode("moonstone")
-  currentStage = moonstone.CurrentStage
+  local moonstone = Tracker:FindObjectForCode("moonstone")
+  if not moonstone then
+    return
+  end
+
+  local currentStage = moonstone.CurrentStage
   
   -- Special handling for when the moonstone has been left in sun keep
   -- but hasn't been picked up yet.  
@@ -275,7 +323,7 @@ function handleMoonstone(keyItem)
   if ((moonstoneState & 0x04) ~= 0 and
       (moonstoneState & 0x40) == 0) then
     -- Moonstone was dropped off but not picked up
-    -- Set moonstone active on the tracker so it doens't get cleared
+    -- Set moonstone active on the tracker so it doesn't get cleared
     moonstone.CurrentStage = 1
     return
   end
@@ -309,7 +357,7 @@ function handleEquippableItem(keyItem)
   local itemOwned = keyItem.found or equipmentSlot == keyItem.value
   
   local trackerItem = Tracker:FindObjectForCode(keyItem.name)  
-  if trackerItem and not trackerItem.Owner.ModifiedByUser then
+  if trackerItem and not modifiedByUser(trackerItem) then
     trackerItem.Active = itemOwned
   end
 
@@ -321,11 +369,11 @@ end
 --
 function handleItemTurnin(keyItem)
 
-  usedItem = (AutoTracker:ReadU8(keyItem.address) & keyItem.flag) ~= 0
-  itemFound = keyItem.found or usedItem
+  local usedItem = (AutoTracker:ReadU8(keyItem.address) & keyItem.flag) ~= 0
+  local itemFound = keyItem.found or usedItem
   
   local trackerItem = Tracker:FindObjectForCode(keyItem.name)
-  if trackerItem and not trackerItem.Owner.ModifiedByUser then
+  if trackerItem and not modifiedByUser(trackerItem) then
     trackerItem.Active = itemFound
   end
 
@@ -389,7 +437,7 @@ function updateItemsFromInventory(segment)
 
   -- Nothing to track if we're not actively in the game
   if not inGame() then
-    return
+    return true
   end
 
   -- Reset all items to "not found"
@@ -401,7 +449,7 @@ function updateItemsFromInventory(segment)
   for i=0,0xF1 do
     local item = segment:ReadUInt8(0x7E2400 + i)
     -- Loop through the table of key items and see if the current 
-    -- inventory slot maches any of them
+    -- inventory slot matches any of them
     for k,v in pairs(KEY_ITEMS) do
       if type(v.value) == "number" then
         if item == v.value then
@@ -427,16 +475,18 @@ function updateItemsFromInventory(segment)
       v.callback(v)
     else
       local trackerItem = Tracker:FindObjectForCode(v.name)
-      if trackerItem and not trackerItem.Owner.ModifiedByUser then
+      if trackerItem and not modifiedByUser(trackerItem) then
         trackerItem.Active = v.found
       else
-        printDebug("Update Items: Unable to find tracker item: " .. name)
+        printDebug("Update Items: Unable to find tracker item: " .. v.name)
       end
     end
   end
   
   -- Check if this puts the player in Go Mode
   handleGoMode()
+
+  return true
   
 end
 
@@ -447,17 +497,17 @@ function updateEventsAndBosses(segment)
 
   -- Nothing to track if we're not actively in the game
   if not inGame() then
-    return
+    return true
   end
 
   -- Don't autotrack during gate travel:
   -- During a gate transition the memory flags holding the event
   -- and boss data are overwritten.  After the animation, memory 
   -- goes back to normal.
-  s1 = segment:ReadUInt16(0x7F0000)
-  s2 = segment:ReadUInt16(0x7F0002)
+  local s1 = segment:ReadUInt16(0x7F0000)
+  local s2 = segment:ReadUInt16(0x7F0002)
   if s1 == 0x4140 and s2 == 0x4342 then
-    return
+    return true
   end
 
   -- Handle boss tracking.
@@ -568,8 +618,10 @@ function updateEventsAndBosses(segment)
   -- tracked this via the inventory, but it can be tracked easier using the event
   -- flag set high after Melchior reforges the sword.  Because it's part of event
   -- memory, check for the tracker item here.
-  melchior = Tracker:FindObjectForCode("melchior")
-  melchior.Active = (segment:ReadUInt8(0x7F0103) & 0x02) ~= 0
+  local melchior = Tracker:FindObjectForCode("melchior")
+  if melchior and not modifiedByUser(melchior) then
+    melchior.Active = (segment:ReadUInt8(0x7F0103) & 0x02) ~= 0
+  end
   
   -- Validation Cat
   -- This is a bit of a meme check.  Validation Cat refers to Crono's cat.
@@ -585,6 +637,8 @@ function updateEventsAndBosses(segment)
   -- Check if the Epoch is capable of flight.
   -- This is used in the Epoch Fail mode of Vanilla Rando
   updateEvent("@Snail Stop/Attach Epoch Wings", segment, 0x7F00BA, 0x80)
+
+  return true
   
 end
 
@@ -593,9 +647,9 @@ end
 --
 function toggleCharacter(name, found)
 
-  character = Tracker:FindObjectForCode(name)
+  local character = Tracker:FindObjectForCode(name)
   if character then
-    if not character.Owner.ModifiedByUser then
+    if not modifiedByUser(character) then
       character.Active = found
     end
   else
@@ -647,7 +701,7 @@ function updateParty(segment)
 
   -- Don't track if we're not actively in game
   if not inGame() then
-    return
+    return true
   end
 
   -- Character IDs:
@@ -660,11 +714,11 @@ function updateParty(segment)
   -- 5 Ayla
   -- 6 Janus (Magus)
 
-  charsFound = 0
+  local charsFound = 0
   -- Loop through the character slots and mark off which ones are found
   -- 0x80 is the "empty" value for a slot
   for i=0, 8 do
-    charId = segment:ReadUInt8(0x7E2980 + i)
+    local charId = segment:ReadUInt8(0x7E2980 + i)
     if charId ~= 0x80 then
       charsFound = charsFound | (1 << charId)
     end
@@ -681,6 +735,8 @@ function updateParty(segment)
   
   -- Check if this puts the player in Go Mode
   handleGoMode()
+
+  return true
   
 end
 
@@ -814,10 +870,10 @@ function updateChests(segment)
   -- During a gate transition the memory flags holding the chest
   -- data  are overwritten.  After the animation, memory 
   -- goes back to normal.
-  s1 = segment:ReadUInt16(0x7F0000)
-  s2 = segment:ReadUInt16(0x7F0002)
+  local s1 = segment:ReadUInt16(0x7F0000)
+  local s2 = segment:ReadUInt16(0x7F0002)
   if s1 == 0x4140 and s2 == 0x4342 then
-    return
+    return true
   end
   
   -- 
@@ -1243,16 +1299,24 @@ function updateChests(segment)
   
   CHECK_COUNTERS.chests = chestsOpened
   updateCollectionCount()
+
+  return true
   
 end
 
 --
 -- Set up memory watches on memory used for autotracking.
 --
-printDebug("Adding memory watches")
-ScriptHost:AddMemoryWatch("Party", 0x7E2980, 9, updateParty)
-ScriptHost:AddMemoryWatch("Events", 0x7F0000, 512, updateEventsAndBosses)
-ScriptHost:AddMemoryWatch("Inventory", 0x7E2400, 0xF2, updateItemsFromInventory)
-ScriptHost:AddMemoryWatch("Chests", 0x7F0000, 0x20, updateChests)
+local ok, err = pcall(function()
+  printDebug("Adding memory watches")
+  ScriptHost:AddMemoryWatch("Party", 0x7E2980, 9, updateParty)
+  ScriptHost:AddMemoryWatch("Events", 0x7F0000, 512, updateEventsAndBosses)
+  ScriptHost:AddMemoryWatch("Inventory", 0x7E2400, 0xF2, updateItemsFromInventory)
+  ScriptHost:AddMemoryWatch("Chests", 0x7F0000, 0x20, updateChests)
+end)
+if not ok then
+  print("Auto-tracker disabled: failed to set up memory watches")
+  print("Reason: " .. tostring(err))
+end
 
 

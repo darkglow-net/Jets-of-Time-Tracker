@@ -1,18 +1,29 @@
 function canAccessSealed() 
-  local pendant = Tracker:FindObjectForCode("pendant").Active
+  local pendantObj = Tracker:FindObjectForCode("pendant")
+  local blackTyranoObj = Tracker:FindObjectForCode("blacktyranoboss")
+  local dragonTankObj = Tracker:FindObjectForCode("dragontankboss")
+  local magusObj = Tracker:FindObjectForCode("magusboss")
+
+  if not pendantObj or not blackTyranoObj or not dragonTankObj or not magusObj then
+    return false
+  end
+
+  local pendant = pendantObj.Active
   local earlyPendant = Tracker:ProviderCountForCode("earlypendant") > 0
-  local blackTyrano = Tracker:FindObjectForCode("blacktyranoboss").Active
-  local dragonTank = Tracker:FindObjectForCode("dragontankboss").Active
-  local magus = Tracker:FindObjectForCode("magusboss").Active
-  local locMode = string.find(Tracker.ActiveVariantUID, "legacy_of_cyrus")
-  local lwMode = string.find(Tracker.ActiveVariantUID, "lost_worlds")
+  local blackTyrano = blackTyranoObj.Active
+  local dragonTank = dragonTankObj.Active
+  local magus = magusObj.Active
+  local uid = Tracker.ActiveVariantUID or ""
+  local locMode = string.find(uid, "legacy_of_cyrus") ~= nil
+  local lwMode = string.find(uid, "lost_worlds") ~= nil
   
   return ((dragonTank or (locMode and pendant)) and earlyPendant) or (pendant and (magus or blackTyrano or lwMode))
 end
 
 function canFly()
   local epochfail = Tracker:ProviderCountForCode("epochfail") > 0
-  local fixedepoch = Tracker:FindObjectForCode("fixedepoch").Active
+  local fixedepochObj = Tracker:FindObjectForCode("fixedepoch")
+  local fixedepoch = fixedepochObj and fixedepochObj.Active or false
 
   return (not epochfail) or fixedepoch
 end

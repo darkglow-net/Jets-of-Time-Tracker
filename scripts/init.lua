@@ -26,8 +26,11 @@ else
   Tracker:AddLayouts("layouts/broadcast.json")
 end
 
-if _VERSION == "Lua 5.3" then
-    ScriptHost:LoadScript("scripts/autotracking.lua")
-else    
-    print("Auto-tracker is unsupported by your tracker version")
+local ok, err = pcall(function()
+  ScriptHost:LoadScript("scripts/autotracking.lua")
+end)
+if not ok then
+  print("Auto-tracker disabled: failed to load scripts/autotracking.lua")
+  print("Reason: " .. tostring(err))
+  print("Hint: ensure the host supports Lua autotracking, the provider/connector is active, and memory watch APIs are available.")
 end
