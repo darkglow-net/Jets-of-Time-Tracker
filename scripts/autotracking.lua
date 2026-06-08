@@ -42,7 +42,7 @@ end
 --
 function modifiedByUser(trackerObject)
 
-  return trackerObject and trackerObject.Owner and trackerObject.Owner.ModifiedByUser
+  return trackerObject ~= nil and trackerObject.Owner ~= nil and trackerObject.Owner.ModifiedByUser == true
 
 end
 
@@ -62,7 +62,7 @@ function itemsOnlyTracking()
 
   local uid = activeVariantUID()
 
-  return string.find(uid, "items")
+  return string.find(uid, "items") ~= nil
 
 end
 
@@ -73,7 +73,7 @@ function lostWorldsMode()
 
   local uid = activeVariantUID()
 
-  return string.find(uid, "lost_world")
+  return string.find(uid, "lost_world") ~= nil
 
 end
 
@@ -84,7 +84,7 @@ function vanillaRandoMode()
 
   local uid = activeVariantUID()
 
-  return string.find(uid, "vanilla")
+  return string.find(uid, "vanilla") ~= nil
 
 end
 
@@ -95,7 +95,7 @@ function legacyOfCyrusMode()
 
   local uid = activeVariantUID()
 
-  return string.find(uid, "legacy_of_cyrus")
+  return string.find(uid, "legacy_of_cyrus") ~= nil
 
 end
 
@@ -477,7 +477,7 @@ function updateItemsFromInventory(segment)
       local trackerItem = Tracker:FindObjectForCode(v.name)
       if trackerItem and not modifiedByUser(trackerItem) then
         trackerItem.Active = v.found
-      else
+      elseif not trackerItem then
         printDebug("Update Items: Unable to find tracker item: " .. v.name)
       end
     end
