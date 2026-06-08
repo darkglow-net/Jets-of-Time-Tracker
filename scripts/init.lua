@@ -26,11 +26,17 @@ else
   Tracker:AddLayouts("layouts/broadcast.json")
 end
 
+if AUTOTRACKER_ENABLE_DEBUG_LOGGING == nil then
+  AUTOTRACKER_ENABLE_DEBUG_LOGGING = false
+end
+
 local ok, err = pcall(function()
   ScriptHost:LoadScript("scripts/autotracking.lua")
 end)
 if not ok then
   print("Auto-tracker disabled: failed to load scripts/autotracking.lua")
-  print("Reason: " .. tostring(err))
-  print("Hint: ensure the host supports Lua autotracking, the provider/connector is active, and memory watch APIs are available.")
+  if AUTOTRACKER_ENABLE_DEBUG_LOGGING then
+    print("Reason: " .. tostring(err))
+    print("Hint: ensure the host supports Lua autotracking, the provider/connector is active, and memory watch APIs are available.")
+  end
 end

@@ -1,5 +1,7 @@
 -- Configuration --------------------------------------
-AUTOTRACKER_ENABLE_DEBUG_LOGGING = false
+if AUTOTRACKER_ENABLE_DEBUG_LOGGING == nil then
+  AUTOTRACKER_ENABLE_DEBUG_LOGGING = false
+end
 -------------------------------------------------------
 
 print("")
