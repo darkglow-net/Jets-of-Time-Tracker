@@ -1307,16 +1307,27 @@ end
 --
 -- Set up memory watches on memory used for autotracking.
 --
-local ok, err = pcall(function()
-  printDebug("Adding memory watches")
-  ScriptHost:AddMemoryWatch("Party", 0x7E2980, 9, updateParty)
-  ScriptHost:AddMemoryWatch("Events", 0x7F0000, 512, updateEventsAndBosses)
-  ScriptHost:AddMemoryWatch("Inventory", 0x7E2400, 0xF2, updateItemsFromInventory)
-  ScriptHost:AddMemoryWatch("Chests", 0x7F0000, 0x20, updateChests)
-end)
-if not ok then
-  print("Auto-tracker disabled: failed to set up memory watches")
-  print("Reason: " .. tostring(err))
+printDebug("Adding memory watches")
+local memoryWatches = {
+  { "Party", 0x7E2980, 9, updateParty },
+  { "Events", 0x7F0000, 512, updateEventsAndBosses },
+  { "Inventory", 0x7E2400, 0xF2, updateItemsFromInventory },
+  { "Chests", 0x7F0000, 0x20, updateChests }
+}
+local watchCount = 0
+for i, watch in ipairs(memoryWatches) do
+  local ok, err = pcall(function()
+    ScriptHost:AddMemoryWatch(watch[1], watch[2], watch[3], watch[4])
+  end)
+  if not ok then
+    print("Auto-tracker warning: failed to set up " .. watch[1] .. " watch")
+    print("Reason: " .. tostring(err))
+  else
+    watchCount = watchCount + 1
+  end
+end
+if watchCount == 0 then
+  print("Auto-tracker disabled: failed to set up any memory watches")
 end
 
 
