@@ -10,8 +10,8 @@ function canAccessSealed()
   local dragonTank = dragonTankObj and dragonTankObj.Active or false
   local magus = magusObj and magusObj.Active or false
   local uid = Tracker.ActiveVariantUID or ""
-  local locMode = string.find(uid, "legacy_of_cyrus") ~= nil
-  local lwMode = string.find(uid, "lost_worlds") ~= nil
+  local locMode = string.find(uid, "legacy_of_cyrus", 1, true) ~= nil
+  local lwMode = string.find(uid, "lost_worlds", 1, true) ~= nil
   
   return ((dragonTank or (locMode and pendant)) and earlyPendant) or (pendant and (magus or blackTyrano or lwMode))
 end
