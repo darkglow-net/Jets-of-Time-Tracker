@@ -1119,7 +1119,7 @@
 					},
 					{
 						"name": "Choras Inn",
-						"access_rules":[],
+						"access_rules":["$canFly"],
 						"sections":
 						[
 							{
@@ -1804,3 +1804,4 @@
 	}
 ]
 			
+
